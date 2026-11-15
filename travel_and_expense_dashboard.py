@@ -37,7 +37,7 @@ def get_api_key():
             return st.secrets["GEMINI_API_KEY"]
     except Exception:
         pass
-    return os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6J4K5NGcJ9ODbu08gJCkua1q4EknxZqcX5V_B9AiGRngg")
+    return os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6KFp7BPTZyhwvt9GPITpWCmK2C0vgd6d4IkfWPK7ko87g")
 
 API_KEY = get_api_key()
 
