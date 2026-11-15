@@ -30,14 +30,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Safe API Key Resolution (Zero keys hardcoded in code)
+# Safe API Key Resolution (Supports both GEMINI_API_KEY and gemini_api_key)
 def get_api_key():
-    try:
-        if "GEMINI_API_KEY" in st.secrets:
-            return st.secrets["GEMINI_API_KEY"]
-    except Exception:
-        pass
-    return os.environ.get("GEMINI_API_KEY", "")
+    for name in ["GEMINI_API_KEY", "gemini_api_key"]:
+        try:
+            if name in st.secrets:
+                return str(st.secrets[name]).strip()
+        except Exception:
+            pass
+    return os.environ.get("GEMINI_API_KEY", "").strip()
 
 SERVER_API_KEY = get_api_key()
 
@@ -226,10 +227,10 @@ HTML_CODE = f"""
                     <button @click="currencyMode = 'INR'" :class="currencyMode === 'INR' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-200 hover:text-white'" class="px-2.5 py-1 rounded-lg transition">₹ INR</button>
                 </div>
 
-                <!-- API Key Config Button (Opens Modal) -->
+                <!-- API Key Status / Button -->
                 <button @click="showKeyModal = true" class="px-3 py-1.5 rounded-xl text-xs font-semibold backdrop-blur-sm transition flex items-center gap-1.5 border shadow-sm" :class="apiKey ? 'bg-emerald-500/20 text-emerald-100 border-emerald-400/40 hover:bg-emerald-500/30' : 'bg-amber-400/20 text-amber-100 border-amber-300/40 hover:bg-amber-400/30'">
                     <i class="fa-solid fa-key text-[11px]"></i>
-                    <span x-text="apiKey ? 'AI Ready' : 'Configure API Key'"></span>
+                    <span x-text="apiKey ? 'AI Active' : 'Enter API Key'"></span>
                 </button>
 
                 <!-- Nav Tabs -->
@@ -257,23 +258,23 @@ HTML_CODE = f"""
             <span x-text="toast.message"></span>
         </div>
 
-        <!-- API KEY MODAL (Zero leaks, stored in your own browser) -->
+        <!-- API KEY MODAL -->
         <div x-show="showKeyModal" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
             <div @click.away="showKeyModal = false" class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-slate-800 space-y-4">
                 <div class="flex justify-between items-center">
                     <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
-                        <i class="fa-solid fa-key text-indigo-600"></i> Google Gemini API Key
+                        <i class="fa-solid fa-key text-indigo-600"></i> Set Google Gemini Key
                     </h3>
                     <button @click="showKeyModal = false" class="text-slate-400 hover:text-slate-600">
                         <i class="fa-solid fa-xmark text-lg"></i>
                     </button>
                 </div>
                 <p class="text-xs text-slate-500 leading-relaxed">
-                    Set your Gemini API key below. It is stored securely in your browser's private storage and is <b>never committed to GitHub</b>.
+                    Make sure your API key starts with <b>AIzaSy...</b> from <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-indigo-600 font-semibold underline">Google AI Studio</a>.
                 </p>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Enter API Key:</label>
-                    <input type="password" x-model="tempKey" placeholder="Paste your Gemini key..." class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <input type="password" x-model="tempKey" placeholder="AIzaSy..." class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
                     <button @click="showKeyModal = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">Cancel</button>
@@ -376,11 +377,11 @@ HTML_CODE = f"""
                         <i class="fa-solid fa-sparkles"></i>
                     </div>
                     <div class="flex-grow w-full">
-                        <input type="text" x-model="aiPromptSuggest" @keydown.enter="generateCustomAISuggestions" placeholder="Ask AI for custom destinations (e.g. 'Beach vacation under ₹50,000' or '4-day mountain trek')..." class="w-full px-3.5 py-2 rounded-lg border border-indigo-200 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm">
+                        <input type="text" x-model="aiPromptSuggest" @keydown.enter="generateCustomAISuggestions" placeholder="Ask for custom ideas (e.g. 'Beach trip under ₹40,000' or 'Rajasthan fort tour')..." class="w-full px-3.5 py-2 rounded-lg border border-indigo-200 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm">
                     </div>
                     <button @click="generateCustomAISuggestions" :disabled="aiSugLoading" class="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-white text-xs font-semibold rounded-lg transition shadow-sm whitespace-nowrap flex items-center justify-center gap-2">
-                        <span x-show="!aiSugLoading"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Get AI Suggestions</span>
-                        <span x-show="aiSugLoading"><i class="fa-solid fa-spinner fa-spin"></i> Generating...</span>
+                        <span x-show="!aiSugLoading"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Find Places</span>
+                        <span x-show="aiSugLoading"><i class="fa-solid fa-spinner fa-spin"></i> Searching...</span>
                     </button>
                 </div>
 
@@ -792,11 +793,10 @@ HTML_CODE = f"""
                     this.toast.message = message;
                     this.toast.success = success;
                     this.toast.show = true;
-                    setTimeout(() => {{ this.toast.show = false; }}, 3500);
+                    setTimeout(() => {{ this.toast.show = false; }}, 4000);
                 }},
 
                 init() {{
-                    // Priority: Streamlit Cloud Secret -> Browser Local Storage
                     this.apiKey = SERVER_KEY || localStorage.getItem('travel_gemini_key') || '';
                     const saved = localStorage.getItem('globetrotter_trips');
                     if (saved) {{
@@ -805,10 +805,14 @@ HTML_CODE = f"""
                 }},
 
                 saveApiKey() {{
-                    if (this.tempKey.trim()) {{
-                        this.apiKey = this.tempKey.trim();
+                    let cleaned = this.tempKey.trim();
+                    if (cleaned) {{
+                        if (!cleaned.startsWith("AIzaSy")) {{
+                            this.showToast("Note: Standard Gemini keys start with 'AIzaSy'.", false);
+                        }}
+                        this.apiKey = cleaned;
                         localStorage.setItem('travel_gemini_key', this.apiKey);
-                        this.showToast('API Key saved securely in your browser!');
+                        this.showToast('API Key saved successfully!');
                         this.tempKey = '';
                     }}
                     this.showKeyModal = false;
@@ -918,8 +922,7 @@ HTML_CODE = f"""
                 async callGemini(promptText) {{
                     if (!this.apiKey) {{
                         this.showKeyModal = true;
-                        this.showToast('Please set your Gemini API Key first.', false);
-                        throw new Error('Missing API key');
+                        throw new Error('Please set a valid Gemini API key in the top right.');
                     }}
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${{this.apiKey}}`;
                     const res = await fetch(url, {{
@@ -928,10 +931,13 @@ HTML_CODE = f"""
                         body: JSON.stringify({{ contents: [{{ parts: [{{ text: promptText }}] }}] }})
                     }});
                     const data = await res.json();
-                    if (data.candidates && data.candidates[0].content.parts[0].text) {{
+                    if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts[0].text) {{
                         return data.candidates[0].content.parts[0].text;
                     }}
-                    throw new Error(data.error ? data.error.message : 'AI service error');
+                    if (data.error) {{
+                        throw new Error(data.error.message || 'Gemini API Error');
+                    }}
+                    throw new Error('Invalid response from AI service');
                 }},
 
                 async generateDailyTip() {{
@@ -940,9 +946,7 @@ HTML_CODE = f"""
                         const reply = await this.callGemini("Give a short 2-sentence travel advice tip for Indian destinations with ticket price benchmarks in USD ($) and INR (₹).");
                         this.aiDashboardMessage = reply.trim();
                     }} catch(e) {{
-                        if (this.apiKey) {{
-                            this.aiDashboardMessage = "💡 Pro Tip: Book Rajasthan and Kerala train passes 3 weeks in advance to save up to 40% on travel!";
-                        }}
+                        this.showToast(e.message, false);
                     }} finally {{
                         this.aiTipLoading = false;
                     }}
@@ -957,7 +961,8 @@ HTML_CODE = f"""
                         const prompt = `You are a travel advisor. Context: ${{context}}. Answer the question in dual currency (USD $ and INR ₹ with 1 USD = 83.5 INR): ${{this.aiQueryText}}`;
                         this.aiResponse = await this.callGemini(prompt);
                     }} catch(e) {{
-                        this.aiResponse = "Could not get AI response. Please ensure your Gemini API key is valid.";
+                        this.aiResponse = "Error: " + e.message;
+                        this.showToast(e.message, false);
                     }} finally {{
                         this.aiLoading = false;
                     }}
@@ -966,12 +971,26 @@ HTML_CODE = f"""
                 async generateCustomAISuggestions() {{
                     if (!this.aiPromptSuggest.trim() || this.aiSugLoading) return;
                     this.aiSugLoading = true;
+                    const query = this.aiPromptSuggest.toLowerCase();
+                    
                     try {{
                         const reply = await this.callGemini(`Recommend 1 destination for '${{this.aiPromptSuggest}}' with estimated flight ticket and budget in both $ and ₹.`);
                         this.aiDashboardMessage = reply.trim();
                         this.showToast('AI recommendation generated!');
                     }} catch(e) {{
-                        this.showToast('AI suggestion failed.', false);
+                        // Fallback: search locally through the 20 destinations
+                        const matched = INITIAL_SUGGESTIONS.filter(s => 
+                            s.city.toLowerCase().includes(query) || 
+                            s.description.toLowerCase().includes(query) || 
+                            s.category.toLowerCase().includes(query) ||
+                            (query.includes('budget') && s.est_budget <= 360)
+                        );
+                        if (matched.length > 0) {{
+                            this.suggestions = matched;
+                            this.showToast(`Found ${{matched.length}} matching places! (Local Search)`);
+                        }} else {{
+                            this.showToast(e.message, false);
+                        }}
                     }} finally {{
                         this.aiSugLoading = false;
                     }}
