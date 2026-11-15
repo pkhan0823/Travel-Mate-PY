@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Hide Streamlit's default headers/padding so your Tailwind dashboard fills the entire screen
+# Hide Streamlit's default headers/padding
 st.markdown("""
 <style>
     #MainMenu {visibility: hidden;}
@@ -30,16 +30,16 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# API Key Resolution
+# Safe API Key Resolution (Zero keys hardcoded in code)
 def get_api_key():
     try:
         if "GEMINI_API_KEY" in st.secrets:
             return st.secrets["GEMINI_API_KEY"]
     except Exception:
         pass
-    return os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6KFp7BPTZyhwvt9GPITpWCmK2C0vgd6d4IkfWPK7ko87g")
+    return os.environ.get("GEMINI_API_KEY", "")
 
-API_KEY = get_api_key()
+SERVER_API_KEY = get_api_key()
 
 # Complete 20 Curated Indian Tourist Destinations
 CURATED_SUGGESTIONS = [
@@ -185,7 +185,6 @@ CURATED_SUGGESTIONS = [
     }
 ]
 
-# Serialized Data for JavaScript Injection
 SUGGESTIONS_JSON = json.dumps(CURATED_SUGGESTIONS)
 
 HTML_CODE = f"""
@@ -227,6 +226,12 @@ HTML_CODE = f"""
                     <button @click="currencyMode = 'INR'" :class="currencyMode === 'INR' ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-200 hover:text-white'" class="px-2.5 py-1 rounded-lg transition">₹ INR</button>
                 </div>
 
+                <!-- API Key Config Button (Opens Modal) -->
+                <button @click="showKeyModal = true" class="px-3 py-1.5 rounded-xl text-xs font-semibold backdrop-blur-sm transition flex items-center gap-1.5 border shadow-sm" :class="apiKey ? 'bg-emerald-500/20 text-emerald-100 border-emerald-400/40 hover:bg-emerald-500/30' : 'bg-amber-400/20 text-amber-100 border-amber-300/40 hover:bg-amber-400/30'">
+                    <i class="fa-solid fa-key text-[11px]"></i>
+                    <span x-text="apiKey ? 'AI Ready' : 'Configure API Key'"></span>
+                </button>
+
                 <!-- Nav Tabs -->
                 <nav class="flex gap-1.5">
                     <button @click="activeTab = 'dashboard'" :class="activeTab === 'dashboard' ? 'bg-indigo-700 shadow-inner' : 'hover:bg-indigo-500'" class="px-3.5 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-1.5">
@@ -250,6 +255,31 @@ HTML_CODE = f"""
         <div x-show="toast.show" x-transition class="fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium flex items-center gap-2" :class="toast.success ? 'bg-emerald-600' : 'bg-rose-600'">
             <i :class="toast.success ? 'fa-solid fa-circle-check' : 'fa-solid fa-circle-exclamation'"></i>
             <span x-text="toast.message"></span>
+        </div>
+
+        <!-- API KEY MODAL (Zero leaks, stored in your own browser) -->
+        <div x-show="showKeyModal" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+            <div @click.away="showKeyModal = false" class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-slate-800 space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-key text-indigo-600"></i> Google Gemini API Key
+                    </h3>
+                    <button @click="showKeyModal = false" class="text-slate-400 hover:text-slate-600">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                <p class="text-xs text-slate-500 leading-relaxed">
+                    Set your Gemini API key below. It is stored securely in your browser's private storage and is <b>never committed to GitHub</b>.
+                </p>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Enter API Key:</label>
+                    <input type="password" x-model="tempKey" placeholder="Paste your Gemini key..." class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button @click="showKeyModal = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">Cancel</button>
+                    <button @click="saveApiKey" class="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition shadow-sm">Save Key</button>
+                </div>
+            </div>
         </div>
 
         <!-- TAB 1: DASHBOARD OVERVIEW -->
@@ -677,12 +707,12 @@ HTML_CODE = f"""
     <!-- Footer -->
     <footer class="bg-white border-t border-slate-100 py-4 mt-auto">
         <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400">
-            Globetrotter Travel Dashboard &bull; Live Ticket Benchmarks &bull; 1 USD ≈ 83.5 INR
+            Travel_Mate Dashboard &bull; Live Ticket Benchmarks &bull; 1 USD ≈ 83.5 INR
         </div>
     </footer>
 
     <script>
-        const GEMINI_API_KEY = "{API_KEY}";
+        const SERVER_KEY = "{SERVER_API_KEY}";
         const INITIAL_SUGGESTIONS = {SUGGESTIONS_JSON};
 
         function travelApp() {{
@@ -693,6 +723,9 @@ HTML_CODE = f"""
                 trips: [],
                 selectedTripId: '',
                 reportTripId: '',
+                apiKey: '',
+                showKeyModal: false,
+                tempKey: '',
                 aiQueryText: '',
                 aiResponse: '',
                 aiLoading: false,
@@ -763,10 +796,22 @@ HTML_CODE = f"""
                 }},
 
                 init() {{
+                    // Priority: Streamlit Cloud Secret -> Browser Local Storage
+                    this.apiKey = SERVER_KEY || localStorage.getItem('travel_gemini_key') || '';
                     const saved = localStorage.getItem('globetrotter_trips');
                     if (saved) {{
                         try {{ this.trips = JSON.parse(saved); }} catch(e) {{}}
                     }}
+                }},
+
+                saveApiKey() {{
+                    if (this.tempKey.trim()) {{
+                        this.apiKey = this.tempKey.trim();
+                        localStorage.setItem('travel_gemini_key', this.apiKey);
+                        this.showToast('API Key saved securely in your browser!');
+                        this.tempKey = '';
+                    }}
+                    this.showKeyModal = false;
                 }},
 
                 saveTrips() {{
@@ -871,7 +916,12 @@ HTML_CODE = f"""
                 }},
 
                 async callGemini(promptText) {{
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${{GEMINI_API_KEY}}`;
+                    if (!this.apiKey) {{
+                        this.showKeyModal = true;
+                        this.showToast('Please set your Gemini API Key first.', false);
+                        throw new Error('Missing API key');
+                    }}
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${{this.apiKey}}`;
                     const res = await fetch(url, {{
                         method: 'POST',
                         headers: {{ 'Content-Type': 'application/json' }},
@@ -881,7 +931,7 @@ HTML_CODE = f"""
                     if (data.candidates && data.candidates[0].content.parts[0].text) {{
                         return data.candidates[0].content.parts[0].text;
                     }}
-                    throw new Error(data.error ? data.error.message : 'AI error');
+                    throw new Error(data.error ? data.error.message : 'AI service error');
                 }},
 
                 async generateDailyTip() {{
@@ -890,7 +940,9 @@ HTML_CODE = f"""
                         const reply = await this.callGemini("Give a short 2-sentence travel advice tip for Indian destinations with ticket price benchmarks in USD ($) and INR (₹).");
                         this.aiDashboardMessage = reply.trim();
                     }} catch(e) {{
-                        this.aiDashboardMessage = "💡 Pro Tip: Book Rajasthan and Kerala train passes 3 weeks in advance to save up to 40% on travel!";
+                        if (this.apiKey) {{
+                            this.aiDashboardMessage = "💡 Pro Tip: Book Rajasthan and Kerala train passes 3 weeks in advance to save up to 40% on travel!";
+                        }}
                     }} finally {{
                         this.aiTipLoading = false;
                     }}
@@ -905,7 +957,7 @@ HTML_CODE = f"""
                         const prompt = `You are a travel advisor. Context: ${{context}}. Answer the question in dual currency (USD $ and INR ₹ with 1 USD = 83.5 INR): ${{this.aiQueryText}}`;
                         this.aiResponse = await this.callGemini(prompt);
                     }} catch(e) {{
-                        this.aiResponse = "AI is currently unavailable. Please verify the Gemini API key.";
+                        this.aiResponse = "Could not get AI response. Please ensure your Gemini API key is valid.";
                     }} finally {{
                         this.aiLoading = false;
                     }}
@@ -931,5 +983,4 @@ HTML_CODE = f"""
 </html>
 """
 
-# Render the exact Tailwind dashboard directly into Streamlit Cloud
 components.html(HTML_CODE, height=1350, scrolling=True)
